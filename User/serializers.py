@@ -93,8 +93,7 @@ class UpdateProfileSerializer(serializers.Serializer):
                     'UserName': username if username else user['UserName'],
                     'updated_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                 }})
-                tg.send(f'{username} Updated UserName')
+                tg.send(f"{user['UserName']} Updated username to {username}")
                 return 2
         else:
             raise serializers.ValidationError('User does not Exist')
-        

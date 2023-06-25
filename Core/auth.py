@@ -18,4 +18,8 @@ def generate_user_token(userid, email):
     jwt_token = encode(payload, "d0a7eef09820f71d9c14", algorithm="HS256")
     return jwt_token
 
-
+def generate_admin_token(userid, email):
+    payload = {'AdminID': adminid, 'Email': email}
+    payload['Time'] = dt.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    jwt_token = encode(payload, "d0a7eef09820f71d9c14", algorithm="HS256")
+    return jwt_token

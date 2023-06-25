@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'sslserver',
+    'Admin',
     'User',
 ]
 
