@@ -1,8 +1,12 @@
-import uuid, secrets, random
+import uuid, secrets
 
 # Function for creating Unique UserIDs for Different Users
-def idgen():
-    return 'TK' + uuid.uuid4().hex[:6].upper()
+def useridgen():
+    return 'TK-' + uuid.uuid4().hex[:6].upper()
+
+# Function for creating Unique IDs for different Items
+def itemidgen():
+    return uuid.uuid4().hex[:8].upper()
 
 # Function for creating Unique Tokens
 def gentoken():
@@ -10,4 +14,4 @@ def gentoken():
 
 # Function to generate transaction id
 def transid():
-    return uuid.uuid4().hex[:9]
+    return uuid.uuid4().hex[:10].upper()

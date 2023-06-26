@@ -11,14 +11,13 @@ def validate_jwt(jwt_token):
         raise Exception('Session Expired! Kindly Login Again')
     return decoded_payload
 
-
 def generate_user_token(userid, email):
     payload = {'UserID': userid, 'Email': email}
     payload['Time'] = dt.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     jwt_token = encode(payload, "d0a7eef09820f71d9c14", algorithm="HS256")
     return jwt_token
 
-def generate_admin_token(userid, email):
+def generate_admin_token(adminid, email):
     payload = {'AdminID': adminid, 'Email': email}
     payload['Time'] = dt.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     jwt_token = encode(payload, "d0a7eef09820f71d9c14", algorithm="HS256")

@@ -63,3 +63,17 @@ class UpdateProfileView(views.APIView):
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: Update User Profile', err)
             return Response({'error': 'Error Occurred'})
+        
+class AddApiView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = AddApiSerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': 'Api added Successfully !'}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: Add Api', err)
+            return Response({'error': 'Error Occurred!'})

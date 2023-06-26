@@ -29,7 +29,7 @@ class RegisterUserSerializer(serializers.Serializer):
         dupl_user = col1.find_one({'$or': [{'UserName': username}, {'Email': email}]}, {'_id': 0})
         if not dupl_user:
             user = col1.insert_one({
-                'UserID': idgen(),
+                'UserID': useridgen(),
                 'UserName': username,
                 'Email': email,
                 'Password': hash_pass,
@@ -97,3 +97,72 @@ class UpdateProfileSerializer(serializers.Serializer):
                 return 2
         else:
             raise serializers.ValidationError('User does not Exist')
+        
+# Add/Create New API
+class AddApiSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        name = validated_data.get('name')
+        fields = dict(validated_data.get('Fields'))
+        balance = dict(validated_data.get('balance'))
+
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        
+        if ('name' not in validated_data) or (name == ''):
+            raise serializers.ValidationError('name is required and cannot be blank')
+        
+        if ('Fields' not in validated_data) or (fields == ''):
+            raise serializers.ValidationError('Fields are required and cannot be blank')
+        
+        requested_fields = set(exist_exchange['Fields'])
+        missing_fields = requested_fields.difference(fields.keys())
+        if (set(fields) != set(requested_fields)) and (missing_fields != ''):
+            raise serializers.ValidationError(f"{exchange} is missing following fields: {missing_fields}")
+        
+        fields = {}
+        for field in requested_fields:
+            if (validated_data['Fields'][field] == ''):
+                raise serializers.ValidationError(f'Invalid value for {field}')
+            if (field in validated_data['Fields']):
+                fields[field] = validated_data['Fields'][field]
+            else:
+                fields[field] = exist_exchange['Fields'][field]
+        validated_data['Fields'] = fields
+
+        if ('balance' not in validated_data) or (balance == ''):
+            raise serializers.ValidationError('balance is required and cannot be blank')
+        
+        user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
+        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by': user['UserName']}, {"Exchange": exchange, 'created_by': user['UserName']}]}, {'_id': 0})
+        if not dupl_api:
+            api = col6.insert_one({
+                'ApiID': itemidgen(),
+                'Name': name,
+                'Fields': fields,
+                'Market': market,
+                'Exchange': exchange,
+                'Balance': balance,
+                'Status': 'ACTIVE',
+                'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                'created_by': user['UserName']
+            })
+            tg.send(f"{user['UserName']} added API: {name} for {exchange} exchange")
+            return api
+        else:
+            raise serializers.ValidationError("API with same Name or same Exchange already Present")
