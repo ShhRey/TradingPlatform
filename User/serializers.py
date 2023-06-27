@@ -1,10 +1,10 @@
 from rest_framework import serializers
-import datetime as dt
 from Core.db import *
 from Core.idgen import *
 from Core.auth import *
 import Core.telegram as tg
-import hashlib
+from Binance_SPOT.trade_func import *
+import hashlib, datetime as dt
 
 # Register New Users
 class RegisterUserSerializer(serializers.Serializer):
@@ -104,8 +104,7 @@ class AddApiSerializer(serializers.Serializer):
         market = validated_data.get('market')
         exchange = validated_data.get('exchange')
         name = validated_data.get('name')
-        fields = dict(validated_data.get('Fields'))
-        balance = dict(validated_data.get('balance'))
+        fields = validated_data.get('fields')
 
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
@@ -127,8 +126,8 @@ class AddApiSerializer(serializers.Serializer):
         if ('name' not in validated_data) or (name == ''):
             raise serializers.ValidationError('name is required and cannot be blank')
         
-        if ('Fields' not in validated_data) or (fields == ''):
-            raise serializers.ValidationError('Fields are required and cannot be blank')
+        if ('fields' not in validated_data) or (not fields):
+            raise serializers.ValidationError('fields are required and cannot be blank')
         
         requested_fields = set(exist_exchange['Fields'])
         missing_fields = requested_fields.difference(fields.keys())
@@ -137,17 +136,20 @@ class AddApiSerializer(serializers.Serializer):
         
         fields = {}
         for field in requested_fields:
-            if (validated_data['Fields'][field] == ''):
+            if (validated_data['fields'][field] == ''):
                 raise serializers.ValidationError(f'Invalid value for {field}')
-            if (field in validated_data['Fields']):
-                fields[field] = validated_data['Fields'][field]
+            if (field in validated_data['fields']):
+                fields[field] = validated_data['fields'][field]
             else:
-                fields[field] = exist_exchange['Fields'][field]
-        validated_data['Fields'] = fields
+                fields[field] = exist_exchange['fields'][field]
+        validated_data['fields'] = fields
 
-        if ('balance' not in validated_data) or (balance == ''):
-            raise serializers.ValidationError('balance is required and cannot be blank')
-        
+        try:
+            user_client = binanceSpotkey(key=validated_data['fields']['API_KEY'], secret=validated_data['fields']['SECRET_KEY'])
+            asset_bal = BS_API_Bal(c=user_client)
+        except:
+            raise serializers.ValidationError("Invalid API or SECRET KEY provided")
+ 
         user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
         dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by': user['UserName']}, {"Exchange": exchange, 'created_by': user['UserName']}]}, {'_id': 0})
         if not dupl_api:
@@ -157,7 +159,8 @@ class AddApiSerializer(serializers.Serializer):
                 'Fields': fields,
                 'Market': market,
                 'Exchange': exchange,
-                'Balance': balance,
+                'Balance': asset_bal,
+                'Type': 'LIVE',
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 'created_by': user['UserName']

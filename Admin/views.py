@@ -74,3 +74,17 @@ class AddExchangeView(views.APIView):
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: Add Exchange', err)
             return Response({'error': 'Error Occurred!'})
+        
+class AddStrategyView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = AddStrategySerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': 'Strategy added Successfully !'}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: Add Strategy', err)
+            return Response({'error': 'Error Occurred!'})

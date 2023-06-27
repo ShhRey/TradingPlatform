@@ -7,4 +7,5 @@ urlpatterns = [
     path('view_profile', ViewProfileView.as_view()),
     path('add_market', AddMarketView.as_view()),
     path('add_exchange', AddExchangeView.as_view()),
+    path('add_strategy', AddStrategyView.as_view()),
 ]

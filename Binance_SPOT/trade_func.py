@@ -5,12 +5,24 @@ def binanceSpotkey(key, secret):
     c = Spot(api_key=key, api_secret=secret)
     return c
 
-# Get Balance for Symbol/Asset
-def BS_balance(c, coin):
+# Get Balance for API
+def BS_API_Bal(c):
+    assets = []
+    asset_list = {}
     k = c.account()
     for i in range(len(k['balances'])):
-        if(k['balances'][i]['asset']==coin):
-            return (k['balances'][i]['free'])
+        if (float(k['balances'][i]['free']) > 0):
+            assets.append(k['balances'][i])
+    for asset in assets:
+        asset_list.update({asset['asset']: asset['free']})
+    return asset_list
+
+# Get Balance for Symbol/Asset
+def BS_balance(c, asset):
+    k = c.account()
+    for i in range(len(k['balances'])):
+        if (k['balances'][i]['asset']==asset):
+            return k['balances'][i]['free']
 
 # Place New Order
 def BS_place_order(c, x, s, ot, q, pr = 0, tif='GTC'):

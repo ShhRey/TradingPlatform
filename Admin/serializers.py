@@ -6,6 +6,8 @@ from Core.auth import *
 import Core.telegram as tg
 import hashlib, datetime as dt
 
+market_types = ['BULLISH', 'BEARISH', 'SIDEWAYS']
+
 # Register New Admins
 class RegisterAdminSerializer(serializers.Serializer):
     def func(self, validated_data):
@@ -108,7 +110,7 @@ class AddExchangeSerializer(serializers.Serializer):
     def func(self, validated_data):
         name = validated_data.get('name')
         market = validated_data.get('market')
-        fields = list(validated_data.get('fields'))
+        fields = validated_data.get('fields')
         type = validated_data.get('type')
         insert_fields = []
 
@@ -127,7 +129,7 @@ class AddExchangeSerializer(serializers.Serializer):
         if ('name' not in validated_data) or (name == ''):
             raise serializers.ValidationError('name is required and cannot be blank')
         
-        if ('fields' not in validated_data) or (fields == ''):
+        if ('fields' not in validated_data) or (not fields):
             raise serializers.ValidationError('fields are required and cannot be blank')
         
         for field in fields:
@@ -158,3 +160,73 @@ class AddExchangeSerializer(serializers.Serializer):
             return exchange
         else:
             raise serializers.ValidationError('Exchange with same name already Exists')
+        
+# Create New Strategy
+class AddStrategySerializer(serializers.Serializer):
+    def func(self, validated_data):
+        name = validated_data.get('name')
+        alias = validated_data.get('alias')
+        market = validated_data.get('market')
+        market_type = validated_data.get('market_type')
+        exchange = validated_data.get('exchange')
+        parameters = validated_data.get('parameters')
+        insert_parameters = []
+
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        
+        if ('name' not in validated_data) or (name == ''):
+            raise serializers.ValidationError('name is required and cannot be blank')
+        
+        if alias and (alias == ''):
+            raise serializers.ValidationError('alias is required and cannot be blank')
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('market_type' not in validated_data) or (market_type == ''):
+            raise serializers.ValidationError('market_type is required and cannot be blank')
+        if (market_type not in market_types):
+            raise serializers.ValidationError('Invalid market_type provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        
+        if ('parameters' not in validated_data) or (not parameters):
+            raise serializers.ValidationError('parameters are required and cannot be blank')
+        
+        for parameter in parameters:
+            if parameter != '':
+                insert_parameters.append(str(parameter).upper())
+            else:
+                raise serializers.ValidationError('Invalid parameter provided')
+        parameters = insert_parameters
+
+        admin = col2.find_one({'AdminID': jwt_data['AdminID']}, {'_id': 0})
+        dupl_strat = col7.find_one({'Name': name}, {'_id': 0})
+        if not dupl_strat:
+            strategy = col7.insert_one({
+                'StrategyID': itemidgen(),
+                'Name': name,
+                'Alias': alias if alias else "",
+                'Market': market,
+                'Market_Type': market_type,
+                'Exchange': exchange,
+                'Parameters': parameters,
+                'Status': 'ACTIVE',
+                'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                'created_by': admin['UserName']
+            })
+            tg.send(f"{admin['UserName']} added New Strategy: {name} in {exchange} Exchange for {market} Market")
+            return strategy
+        else:
+            raise serializers.ValidationError('Strategy with same name already Exists')
