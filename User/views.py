@@ -77,3 +77,17 @@ class AddApiView(views.APIView):
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: Add Api', err)
             return Response({'error': 'Error Occurred!'})
+        
+class ActiveApiView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = ActiveApiSerializer()
+            apis = serializer.func(request.data)
+            if apis:
+                return Response({'data': apis}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: User Active Apis', err)
+            return Response({'error': 'Error Occurred!'})

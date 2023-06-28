@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'sslserver',
     'Admin',
     'User',
+    'Binance_SPOT',
 ]
 
 MIDDLEWARE = [

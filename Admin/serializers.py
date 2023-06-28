@@ -65,6 +65,8 @@ class AdminLoginSerializer(serializers.Serializer):
 # View Admin Profile
 class ViewProfileSerializer(serializers.Serializer):
     def func(self, validated_data):
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -81,6 +83,8 @@ class AddMarketSerializer(serializers.Serializer):
     def func(self, validated_data):
         name = validated_data.get('name')
 
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -97,8 +101,11 @@ class AddMarketSerializer(serializers.Serializer):
                 'Name': name,
                 'Coins': {},
                 'Status':'ACTIVE',
-                'created_at': dt.datetime.now().strftime("%d/%m/%Y, %H:%M:%S"),
-                'created_by': admin['UserName']
+                'created_at': dt.datetime.now().strftime("%d-%m-%Y, %H:%M:%S"),
+                'created_by': {
+                    "AdminID": jwt_data['AdminID'],
+                    "Name": admin['UserName']
+                }
             })
             tg.send(f"{admin['UserName']} added New Market: {name}")
             return market
@@ -114,6 +121,8 @@ class AddExchangeSerializer(serializers.Serializer):
         type = validated_data.get('type')
         insert_fields = []
 
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -153,7 +162,10 @@ class AddExchangeSerializer(serializers.Serializer):
                 'Type': type,
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-                'created_by': admin['UserName']
+                'created_by': {
+                    "AdminID": jwt_data['AdminID'],
+                    "Name": admin['UserName']
+                }
             })
             tg.send(f"{admin['UserName']} added New Exchange: {name} for {market}")
             call_command('startapp', name)
@@ -172,6 +184,8 @@ class AddStrategySerializer(serializers.Serializer):
         parameters = validated_data.get('parameters')
         insert_parameters = []
 
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -224,7 +238,10 @@ class AddStrategySerializer(serializers.Serializer):
                 'Parameters': parameters,
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-                'created_by': admin['UserName']
+                'created_by': {
+                    "AdminID": jwt_data['AdminID'],
+                    "Name": admin['UserName']
+                }
             })
             tg.send(f"{admin['UserName']} added New Strategy: {name} in {exchange} Exchange for {market} Market")
             return strategy

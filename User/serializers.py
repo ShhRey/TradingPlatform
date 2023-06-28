@@ -63,6 +63,8 @@ class LoginUserSerializer(serializers.Serializer):
 # View User Profile
 class ViewProfileSerializer(serializers.Serializer):
     def func(self, validated_data):
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -79,6 +81,12 @@ class UpdateProfileSerializer(serializers.Serializer):
     def func(self, validated_data):
         username = validated_data.get('username')
 
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -106,6 +114,8 @@ class AddApiSerializer(serializers.Serializer):
         name = validated_data.get('name')
         fields = validated_data.get('fields')
 
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
         try:
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
@@ -163,9 +173,27 @@ class AddApiSerializer(serializers.Serializer):
                 'Type': 'LIVE',
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-                'created_by': user['UserName']
+                'created_by': {
+                    "UserID": jwt_data['UserID'],
+                    "Name": user['UserName']
+                }
             })
             tg.send(f"{user['UserName']} added API: {name} for {exchange} exchange")
             return api
         else:
             raise serializers.ValidationError("API with same Name or same Exchange already Present")
+        
+# User Created Active APIs
+class ActiveApiSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        user_apis = list(col6.find({'created_by.UserID': jwt_data['UserID'], 'Status': 'ACTIVE'}, {'_id': 0}))
+        if user_apis:
+            return user_apis
+        else: 
+            raise serializers.ValidationError('No Active APIs')
