@@ -161,7 +161,7 @@ class AddApiSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid API or SECRET KEY provided")
  
         user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
-        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by': user['UserName']}, {"Exchange": exchange, 'created_by': user['UserName']}]}, {'_id': 0})
+        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by.Name': user['UserName']}, {"Exchange": exchange, 'created_by.Name': user['UserName']}, {'fields.API_KEY': validated_data['fields']['API_KEY']}, {'fields.SECRET_KEY': validated_data['fields']['SECRET_KEY']}]}, {'_id': 0})
         if not dupl_api:
             api = col6.insert_one({
                 'ApiID': itemidgen(),
@@ -181,7 +181,7 @@ class AddApiSerializer(serializers.Serializer):
             tg.send(f"{user['UserName']} added API: {name} for {exchange} exchange")
             return api
         else:
-            raise serializers.ValidationError("API with same Name or same Exchange already Present")
+            raise serializers.ValidationError("API with same Name+User / Exchange+User / Fields already Present")
         
 # User Created Active APIs
 class ActiveApiSerializer(serializers.Serializer):
