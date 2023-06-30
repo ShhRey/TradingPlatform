@@ -1,7 +1,9 @@
 from decimal import Decimal
+from binance.spot import Spot
 
-def get_precision(c, coin, price, quantity, id):
+def check_precision(coin, price, quantity):
     try:
+        c = Spot()
         data = c.exchange_info(coin)['symbols'][0]
         precision = {}
         precision['price'] = Decimal(data['filters'][0]['tickSize'].find('1') - 1)

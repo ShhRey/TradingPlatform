@@ -45,8 +45,21 @@ class OpenOrderView(views.APIView):
             return Response({'error': ve.detail[0]})
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: Spot View Orders', err)
+            return Response({'error': 'Error Occurred!'}) 
+
+class OrderHistoryView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = OrderHitorySerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': user}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: Spot View Orders', err)
             return Response({'error': 'Error Occurred!'})
-            
         
 class LimitBuyOrderView(views.APIView):
     @method_decorator(csrf_exempt, name='dispatch')
@@ -60,4 +73,18 @@ class LimitBuyOrderView(views.APIView):
             return Response({'error': ve.detail[0]})
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: Spot Limit Buy', err)
+            return Response({'error': 'Error Occurred!'})
+        
+class LimitSellOrderView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = PlaceLimitSellSerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': 'Order Successfully Placed.'}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: Spot Limit Sell', err)
             return Response({'error': 'Error Occurred!'})

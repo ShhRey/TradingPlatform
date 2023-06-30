@@ -63,25 +63,3 @@ def BS_delete_order(c, x, oid):
 def BS_delete_all_orders(c, x):
     r = c.cancel_open_orders(symbol=x)
     return r
-
-
-# Check Decimals for Coin
-def BS_check_precision(c, x):
-    r = c.exchange_info(symbol=x)
-    filters = r['symbols'][0]['filters']
-    
-    price_filter = None
-    size_filter = None
-
-    for type in filters:
-        if type['filterType'] == 'PRICE_FILTER':
-            price_filter = type
-        elif type['filterType'] == 'LOT_SIZE':
-            size_filter = type
-    
-    min_price = price_filter['minPrice'] if price_filter else None
-    max_price = price_filter['maxPrice'] if price_filter else None
-    min_qty = size_filter['minQty'] if size_filter else None
-    max_qty = size_filter['maxQty'] if size_filter else None
-
-    return min_price, max_price, min_qty, max_qty
