@@ -4,6 +4,7 @@ from Core.idgen import *
 from Core.auth import *
 import Core.telegram as tg
 from Binance_SPOT.trade_func import *
+from Binance_FUTURE.trade_func import *
 import hashlib, datetime as dt
 
 # Register New Users
@@ -155,13 +156,17 @@ class AddApiSerializer(serializers.Serializer):
         validated_data['fields'] = fields
 
         try:
-            user_client = binanceSpotkey(key=validated_data['fields']['API_KEY'], secret=validated_data['fields']['SECRET_KEY'])
-            asset_bal = BS_API_Bal(c=user_client)
+            if exist_exchange['Name'] == 'Binance_SPOT':
+                user_client = binanceSpotkey(key=validated_data['fields']['API_KEY'], secret=validated_data['fields']['SECRET_KEY'])
+                asset_bal = BS_API_Bal(c=user_client)
+            if exist_exchange['Name'] == 'Binance_FUTURE':
+                user_client = binanceFuturekey(key=validated_data['fields']['API_KEY'], secret=validated_data['fields']['SECRET_KEY'])
+                asset_bal = UMF_API_Bal(c=user_client)
         except:
             raise serializers.ValidationError("Invalid API or SECRET KEY provided")
  
         user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
-        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by.Name': user['UserName']}, {"Exchange": exchange, 'created_by.Name': user['UserName']}, {'fields.API_KEY': validated_data['fields']['API_KEY']}, {'fields.SECRET_KEY': validated_data['fields']['SECRET_KEY']}]}, {'_id': 0})
+        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by.Name': user['UserName']}, {"Exchange": exchange, 'created_by.Name': user['UserName']}, {'fields.API_KEY': validated_data['fields']['API_KEY'], 'fields.SECRET_KEY': validated_data['fields']['SECRET_KEY']}]}, {'_id': 0})
         if not dupl_api:
             api = col6.insert_one({
                 'ApiID': itemidgen(),
@@ -169,7 +174,7 @@ class AddApiSerializer(serializers.Serializer):
                 'Fields': fields,
                 'Market': market,
                 'Exchange': exchange,
-                'Balance': asset_bal,
+                'Balance': asset_bal if asset_bal else {},
                 'Type': 'LIVE',
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),

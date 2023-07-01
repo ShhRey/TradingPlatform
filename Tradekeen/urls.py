@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', include('Admin.urls')),
     path('user/', include('User.urls')),
     path('binance_spot/', include('Binance_SPOT.urls')),
+    path('binance_future/', include('Binance_FUTURE.urls')),
 ]

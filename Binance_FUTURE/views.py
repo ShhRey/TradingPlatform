@@ -16,7 +16,7 @@ class LiveApiBalView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot LiveBal', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture LiveBal', err)
             return Response({'error': 'Error Occurred!'})
         
 class DBApiBalView(views.APIView):
@@ -30,7 +30,7 @@ class DBApiBalView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot GetBal', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture GetBal', err)
             return Response({'error': 'Error Occurred!'})
         
 class OpenOrderView(views.APIView):
@@ -44,7 +44,7 @@ class OpenOrderView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot View Orders', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture View Orders', err)
             return Response({'error': 'Error Occurred!'}) 
 
 class OrderHistoryView(views.APIView):
@@ -58,7 +58,7 @@ class OrderHistoryView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot Order History', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Order History', err)
             return Response({'error': 'Error Occurred!'})
         
 class LimitBuyOrderView(views.APIView):
@@ -72,7 +72,7 @@ class LimitBuyOrderView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot Limit Buy', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Limit Buy', err)
             return Response({'error': 'Error Occurred!'})
         
 class LimitSellOrderView(views.APIView):
@@ -86,7 +86,7 @@ class LimitSellOrderView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot Limit Sell', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Limit Sell', err)
             return Response({'error': 'Error Occurred!'})
         
 class MarketBuyOrderView(views.APIView):
@@ -100,7 +100,7 @@ class MarketBuyOrderView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot Market Buy', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Market Buy', err)
             return Response({'error': 'Error Occurred!'})
         
 class MarketSellOrderView(views.APIView):
@@ -114,5 +114,5 @@ class MarketSellOrderView(views.APIView):
         except ValidationError as ve:
             return Response({'error': ve.detail[0]})
         except Exception as err:
-            tg.send(f'Error Occurred at \nAPI: BinanceSpot Market Sell', err)
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Market Sell', err)
             return Response({'error': 'Error Occurred!'})

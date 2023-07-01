@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'Admin',
     'User',
     'Binance_SPOT',
+    'Binance_FUTURE',
 ]
 
 MIDDLEWARE = [
