@@ -108,7 +108,7 @@ class ViewOpenOrderSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided')
         
@@ -156,7 +156,7 @@ class OrderHitorySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided')
         
@@ -205,9 +205,9 @@ class PlaceLimitBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -227,9 +227,9 @@ class PlaceLimitBuySerializer(serializers.Serializer):
             if spot_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = BS_place_order(c=c, x=coin, s='BUY', ot='LIMIT', pr=upd_price, q=upd_quantity)
                 print(order)
-                order = col8.insert_one({
+                col8.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['transactTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
@@ -239,7 +239,9 @@ class PlaceLimitBuySerializer(serializers.Serializer):
                     'CummQuoteQty': order['cummulativeQuoteQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
-                    'OrderedVia': 'API',
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
+                    'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Limit BUY Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
                 return order
@@ -278,9 +280,9 @@ class PlaceLimitSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -300,9 +302,9 @@ class PlaceLimitSellSerializer(serializers.Serializer):
             if spot_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = BS_place_order(c=c, x=coin, s='SELL', ot='LIMIT', pr=upd_price, q=upd_quantity)
                 print(order)
-                order = col8.insert_one({
+                col8.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['transactTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
@@ -312,7 +314,9 @@ class PlaceLimitSellSerializer(serializers.Serializer):
                     'CummQuoteQty': order['cummulativeQuoteQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
-                    'OrderedVia': 'API',
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
+                    'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Limit SELL Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
                 return order
@@ -351,9 +355,9 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -370,9 +374,9 @@ class PlaceMarketBuySerializer(serializers.Serializer):
             if spot_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = BS_place_order(c=c, x=coin, s='BUY', ot='MARKET', q=upd_quantity)
                 print(order)
-                order = col8.insert_one({
+                col8.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['transactTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
@@ -382,7 +386,9 @@ class PlaceMarketBuySerializer(serializers.Serializer):
                     'CummQuoteQty': order['cummulativeQuoteQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
-                    'OrderedVia': 'API',
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
+                    'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Market BUY Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
                 return order
@@ -421,9 +427,9 @@ class PlaceMarketSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -440,9 +446,9 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             if spot_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = BS_place_order(c=c, x=coin, s='SELL', ot='MARKET', q=upd_quantity)
                 print(order)
-                order = col8.insert_one({
+                col8.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['transactTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
@@ -452,7 +458,9 @@ class PlaceMarketSellSerializer(serializers.Serializer):
                     'CummQuoteQty': order['cummulativeQuoteQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
-                    'OrderedVia': 'API',
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
+                    'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Market SELL Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
                 return order

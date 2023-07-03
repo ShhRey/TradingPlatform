@@ -4,6 +4,8 @@ from .views import *
 urlpatterns = [
     path('fetch_api_bal', LiveApiBalView.as_view()),
     path('get_api_bal', DBApiBalView.as_view()),
+    path('get_position_mode', GetPositionModeView.as_view()),
+    path('change_position_mode', ChangePositionModeView.as_view()),
     path('open_orders', OpenOrderView.as_view()),
     path('order_history', OrderHistoryView.as_view()),
     path('limit_buy', LimitBuyOrderView.as_view()),

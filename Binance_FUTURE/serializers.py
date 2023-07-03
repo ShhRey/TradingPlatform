@@ -79,6 +79,95 @@ class GetDBApiBalSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid api_name provided')
 
+# Get PositionMode for API
+class GetPositionModeSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        if exchange != 'Binance_FUTURE':
+            raise serializers.ValidationError('PositionMode is supported only in Binance_FUTURES')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        try:
+            posi_mode = UMF_get_position_mode(c=binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY']))
+            if posi_mode:
+                posi_mode = str(posi_mode['dualSidePosition'])
+                col6.update_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'$set': {'Settings.PositionMode': posi_mode}})
+                return posi_mode
+            else:
+                raise serializers.ValidationError('PositionMode not set for API')
+        except:
+            raise serializers.ValidationError('Invalid api_name provided')
+        
+# Change PositionMode for User API
+class ChangePositionModeSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+        position = str(validated_data.get('position'))
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        if exchange != 'Binance_FUTURE':
+            raise serializers.ValidationError('PositionMode is supported only in Binance_FUTURES')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+
+        if ('position' not in validated_data) or (position == ''):
+            raise serializers.ValidationError('position is required and cannot be blank')
+        if (position == exist_api['Settings']['PositionMode']):
+            raise serializers.ValidationError('No need to change position')
+        try:
+            c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY']) 
+            change_mode = UMF_change_position_mode(c=c, dsp=position)
+            if change_mode['dualSidePosition']:
+                change_mode = str(change_mode['dualSidePosition'])
+                col6.update_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'$set': {'PositionMode': change_mode}})
+                return change_mode  
+        except:
+            raise serializers.ValidationError('Currently position cannot be changed')
+
 # View User's Open Orders
 class ViewOpenOrderSerializer(serializers.Serializer):
     def func(self, validated_data):
@@ -109,7 +198,7 @@ class ViewOpenOrderSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided')
         
@@ -121,7 +210,6 @@ class ViewOpenOrderSerializer(serializers.Serializer):
             orders = UMF_open_orders(c=c, x=coin)
         except:
             raise serializers.ValidationError('Invalid API Credentials')
-        print(len(orders))
         if len(orders) == 0:
             raise serializers.ValidationError('No Open Orders Yet !')
         else:
@@ -206,9 +294,9 @@ class PlaceLimitBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -228,17 +316,20 @@ class PlaceLimitBuySerializer(serializers.Serializer):
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = UMF_place_order(c=c, x=coin, s='BUY', ot='LIMIT', pr=upd_price, q=upd_quantity, ps="LONG")
                 print(order)
-                order = col9.insert_one({
+                col9.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['updateTime']),
                     'Coin': order['symbol'],
-                    'OrderType': order['origType'],
+                    'OrderType': order['type'],
                     'Side': order['side'],
                     'OrderPrice': order['price'],
-                    'Quantity': order['origQty'],
-                    'OrderAmt': order['cummulativeQuoteQty'],
+                    'OrderQty': order['origQty'],
+                    'ExecQty': order['executedQty'],
+                    'CummQuoteQty': order['cumQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
                     'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Limit BUY Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
@@ -278,9 +369,9 @@ class PlaceLimitSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -300,18 +391,20 @@ class PlaceLimitSellSerializer(serializers.Serializer):
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = UMF_place_order(c=c, x=coin, s='SELL', ot='LIMIT', pr=upd_price, q=upd_quantity)
                 print(order)
-                order = col9.insert_one({
+                col9.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['updateTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
-                    'CummQuoteQty': order['cummulativeQuoteQty'],
+                    'CummQuoteQty': order['cumQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
                     'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Limit SELL Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
@@ -351,9 +444,9 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -370,18 +463,20 @@ class PlaceMarketBuySerializer(serializers.Serializer):
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = UMF_place_order(c=c, x=coin, s='BUY', ot='MARKET', q=upd_quantity)
                 print(order)
-                order = col9.insert_one({
+                col9.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['updateTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
-                    'CummQuoteQty': order['cummulativeQuoteQty'],
+                    'CummQuoteQty': order['cumQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
                     'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Market BUY Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")
@@ -421,9 +516,9 @@ class PlaceMarketSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
-            raise serializers.ValidationError('Invalid api_name provided')
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
@@ -440,18 +535,20 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
                 order = UMF_place_order(c=c, x=coin, s='SELL', ot='MARKET', q=upd_quantity)
                 print(order)
-                order = col9.insert_one({
+                col9.insert_one({
                     'OrderID': str(order['orderId']),
-                    'OrderTime': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'OrderTime': str(order['updateTime']),
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
-                    'CummQuoteQty': order['cummulativeQuoteQty'],
+                    'CummQuoteQty': order['cumQty'],
                     'Status': order['status'],
                     'TimeInForce': order['timeInForce'],
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
                     'OrderedVia': 'MANUAL',
                 })
                 tg.send(f"Market SELL Order Placed on {exchange} by {user['UserName']} via API: {exist_api['Name']}")

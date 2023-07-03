@@ -25,7 +25,6 @@ def UMF_balance(c, x):
 # Place New Order
 def UMF_place_order(c, x, s, ot, q, pr = 0, tif='GTC', ps='BOTH'):
     if ((ot=='LIMIT') and ((ps=='BOTH') or (ps=='LONG') or (ps=='SHORT'))):
-        print(ps)
         r = c.new_order(symbol=x, side = s, positionSide=ps, type = ot, quantity = q, price = pr, timeInForce = tif)
     elif (ot=='MARKET'):
         r = c.new_order(symbol=x, side = s, type = ot, quantity = q)
@@ -72,12 +71,12 @@ def UMF_modify_leverage(c, x, l):
 
 # ============================ Didnt Check These ==============================
 
-def UMF_get_position_mode(c, x):
-    r = c.get_position_mode(symbol=x)
+def UMF_get_position_mode(c):
+    r = c.get_position_mode()
     return r
 
-def UMF_change_position_mode(c, x, dsp):
-    r = c.change_position_mode(symbol=x, dualSidePosition=dsp)
+def UMF_change_position_mode(c, dsp):
+    r = c.change_position_mode(dualSidePosition=dsp)
     return r
 
 def UMF_get_asset_mode(c, x):

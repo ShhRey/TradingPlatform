@@ -177,6 +177,10 @@ class AddApiSerializer(serializers.Serializer):
                 'Balance': asset_bal if asset_bal else {},
                 'Type': 'LIVE',
                 'Status': 'ACTIVE',
+                'Settings': {
+                    'PositionMode': 'false',        # "true": Hedge Mode; "false": One-way Mode
+                    'MultiAssetMode': 'false',      # "true": Multi-Assets Mode; "false": Single-Asset Mode
+                } if exchange=='Binance_FUTURE' else {},
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 'created_by': {
                     "UserID": jwt_data['UserID'],
@@ -197,7 +201,7 @@ class ActiveApiSerializer(serializers.Serializer):
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
             raise serializers.ValidationError("Invalid JWT token")
-        user_apis = list(col6.find({'created_by.UserID': jwt_data['UserID'], 'Status': 'ACTIVE'}, {'_id': 0}))
+        user_apis = list(col6.find({'created_by.UserID': jwt_data['UserID'], 'Type': 'LIVE', 'Status': 'ACTIVE'}, {'_id': 0}))
         if user_apis:
             return user_apis
         else: 
