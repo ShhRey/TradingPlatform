@@ -79,13 +79,13 @@ def UMF_change_position_mode(c, dsp):
     r = c.change_position_mode(dualSidePosition=dsp)
     return r
 
-def UMF_get_asset_mode(c, x):
-    r = c.get_multi_asset_mode(symbol=x)
+def UMF_get_asset_mode(c):
+    r = c.get_multi_asset_mode()
     return r
 
 
-def UMF_change_asset_mode(c, x, mam):
-    r = c.change_multi_asset_mode(symbol=x, multiAssetsMargin=mam)
+def UMF_change_asset_mode(c, mam):
+    r = c.change_multi_asset_mode(multiAssetsMargin=mam)
     return r
 
 

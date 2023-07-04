@@ -120,7 +120,7 @@ class GetPositionModeSerializer(serializers.Serializer):
                 raise serializers.ValidationError('PositionMode not set for API')
         except:
             raise serializers.ValidationError('Invalid api_name provided')
-        
+
 # Change PositionMode for User API
 class ChangePositionModeSerializer(serializers.Serializer):
     def func(self, validated_data):
@@ -156,6 +156,8 @@ class ChangePositionModeSerializer(serializers.Serializer):
 
         if ('position' not in validated_data) or (position == ''):
             raise serializers.ValidationError('position is required and cannot be blank')
+        if position not in ('True', 'False'):
+            raise serializers.ValidationError('position only accepts either True or False')
         if (position == exist_api['Settings']['PositionMode']):
             raise serializers.ValidationError('No need to change position')
         try:
@@ -166,7 +168,99 @@ class ChangePositionModeSerializer(serializers.Serializer):
                 col6.update_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'$set': {'PositionMode': change_mode}})
                 return change_mode  
         except:
-            raise serializers.ValidationError('Currently position cannot be changed')
+            raise serializers.ValidationError('Currently PositionMode cannot be changed')
+
+# Get AssetMode for API
+class GetAssetModeSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        if exchange != 'Binance_FUTURE':
+            raise serializers.ValidationError('PositionMode is supported only in Binance_FUTURES')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        try:
+            asset_mode = UMF_get_asset_mode(c=binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY']))
+            print(asset_mode)
+            if asset_mode:
+                asset_mode = str(asset_mode['multiAssetsMargin'])
+                col6.update_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'$set': {'Settings.MultiAssetMode': asset_mode}})
+                return asset_mode
+            else:
+                raise serializers.ValidationError('MultiAssetMode not set for API')
+        except:
+            raise serializers.ValidationError('Invalid api_name provided')
+
+# Change AssetMode for User API
+class ChangeAssetModeSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+        asset = str(validated_data.get('asset'))
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        if exchange != 'Binance_FUTURE':
+            raise serializers.ValidationError('AssetMode is supported only in Binance_FUTURES')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+
+        if ('asset' not in validated_data) or (asset == ''):
+            raise serializers.ValidationError('asset is required and cannot be blank')
+        if asset not in ('True', 'False'):
+            raise serializers.ValidationError('asset only accepts either True or False')
+        if (asset == exist_api['Settings']['MultiAssetMode']):
+            raise serializers.ValidationError('No need to change asset')
+        try:
+            c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY']) 
+            change_mode = UMF_change_asset_mode(c=c, mam=asset)
+            if change_mode['code'] == 200 and change_mode['msg'] == 'success':
+                change_mode = asset
+                col6.update_one({'Name': api_name, 'Exchange': exchange, 'created_by.UserID': jwt_data['UserID']}, {'$set': {'Settings.MultiAssetMode': change_mode}})
+                return change_mode  
+        except:
+            raise serializers.ValidationError('Currently AssetMode cannot be changed')
 
 # View User's Open Orders
 class ViewOpenOrderSerializer(serializers.Serializer):
@@ -294,7 +388,7 @@ class PlaceLimitBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -306,6 +400,15 @@ class PlaceLimitBuySerializer(serializers.Serializer):
         
         if ('quantity' not in validated_data) or quantity == '':
             raise serializers.ValidationError('quantity is required and cannot be blank')
+        
+        if exist_api['Settings']['PositionMode'] == 'True':
+            posi_side = validated_data.get('posi_side')
+            if ('posi_side' not in validated_data) or (posi_side == ''):
+                raise serializers.ValidationError('API set for HEDGE. posi_side is required and cannot be blank')
+            if posi_side not in ('LONG', 'SHORT'):
+                raise serializers.ValidationError('posi_side only accepts either LONG or SHORT')
+        else:
+            posi_side = 'BOTH'
 
         try:
             pre_values = check_futures_precision(coin=coin, price=price, quantity=quantity)
@@ -314,7 +417,7 @@ class PlaceLimitBuySerializer(serializers.Serializer):
             c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
             
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
-                order = UMF_place_order(c=c, x=coin, s='BUY', ot='LIMIT', pr=upd_price, q=upd_quantity, ps="LONG")
+                order = UMF_place_order(c=c, x=coin, s='BUY', ot='LIMIT', pr=upd_price, q=upd_quantity, ps=posi_side)
                 print(order)
                 col9.insert_one({
                     'OrderID': str(order['orderId']),
@@ -322,6 +425,7 @@ class PlaceLimitBuySerializer(serializers.Serializer):
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
+                    'PositionSide': order['positionSide'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
@@ -369,7 +473,7 @@ class PlaceLimitSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -381,6 +485,18 @@ class PlaceLimitSellSerializer(serializers.Serializer):
         
         if ('quantity' not in validated_data) or quantity == '':
             raise serializers.ValidationError('quantity is required and cannot be blank')
+        
+        try: 
+            if exist_api['Settings']['PositionMode'] == 'True':
+                posi_side = validated_data.get('posi_side')
+                if ('posi_side' not in validated_data) or (posi_side == ''):
+                    raise serializers.ValidationError('API set for HEDGE. posi_side is required and cannot be blank')
+                if posi_side not in ('LONG', 'SHORT'):
+                    raise serializers.ValidationError('posi_side only accepts either LONG or SHORT')
+            else:
+                posi_side = 'BOTH'
+        except:
+            raise serializers.ValidationError('PositionMode cannot be Changed')
 
         try:
             pre_values = check_futures_precision(coin=coin, price=price, quantity=quantity)
@@ -389,7 +505,7 @@ class PlaceLimitSellSerializer(serializers.Serializer):
             c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
             
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
-                order = UMF_place_order(c=c, x=coin, s='SELL', ot='LIMIT', pr=upd_price, q=upd_quantity)
+                order = UMF_place_order(c=c, x=coin, s='SELL', ot='LIMIT', pr=upd_price, q=upd_quantity, ps=posi_side)
                 print(order)
                 col9.insert_one({
                     'OrderID': str(order['orderId']),
@@ -397,6 +513,7 @@ class PlaceLimitSellSerializer(serializers.Serializer):
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
+                    'PositionSide': order['positionSide'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
@@ -444,7 +561,7 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -453,6 +570,18 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         
         if ('quantity' not in validated_data) or quantity == '':
             raise serializers.ValidationError('quantity is required and cannot be blank')
+        
+        try: 
+            if exist_api['Settings']['PositionMode'] == 'True':
+                posi_side = validated_data.get('posi_side')
+                if ('posi_side' not in validated_data) or (posi_side == ''):
+                    raise serializers.ValidationError('API set for HEDGE. posi_side is required and cannot be blank')
+                if posi_side not in ('LONG', 'SHORT'):
+                    raise serializers.ValidationError('posi_side only accepts either LONG or SHORT')
+            else:
+                posi_side = 'BOTH'
+        except:
+            raise serializers.ValidationError('PositionMode cannot be Changed')
 
         try:
             pre_values = check_futures_precision(coin=coin, price=price, quantity=quantity)
@@ -469,6 +598,7 @@ class PlaceMarketBuySerializer(serializers.Serializer):
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
+                    'PositionSide': order['positionSide'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
@@ -516,7 +646,7 @@ class PlaceMarketSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -525,6 +655,18 @@ class PlaceMarketSellSerializer(serializers.Serializer):
         
         if ('quantity' not in validated_data) or quantity == '':
             raise serializers.ValidationError('quantity is required and cannot be blank')
+        
+        try: 
+            if exist_api['Settings']['PositionMode'] == 'True':
+                posi_side = validated_data.get('posi_side')
+                if ('posi_side' not in validated_data) or (posi_side == ''):
+                    raise serializers.ValidationError('API set for HEDGE. posi_side is required and cannot be blank')
+                if posi_side not in ('LONG', 'SHORT'):
+                    raise serializers.ValidationError('posi_side only accepts either LONG or SHORT')
+            else:
+                posi_side = 'BOTH'
+        except:
+            raise serializers.ValidationError('PositionMode cannot be Changed')
 
         try:
             pre_values = check_futures_precision(coin=coin, price=price, quantity=quantity)
@@ -533,7 +675,7 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
             
             if future_min_vol(coin=coin) <= (float(upd_price) * float(upd_quantity)):
-                order = UMF_place_order(c=c, x=coin, s='SELL', ot='MARKET', q=upd_quantity)
+                order = UMF_place_order(c=c, x=coin, s='SELL', ot='MARKET', q=upd_quantity, ps=posi_side)
                 print(order)
                 col9.insert_one({
                     'OrderID': str(order['orderId']),
@@ -541,6 +683,7 @@ class PlaceMarketSellSerializer(serializers.Serializer):
                     'Coin': order['symbol'],
                     'OrderType': order['type'],
                     'Side': order['side'],
+                    'PositionSide': order['positionSide'],
                     'OrderPrice': order['price'],
                     'OrderQty': order['origQty'],
                     'ExecQty': order['executedQty'],
@@ -555,3 +698,60 @@ class PlaceMarketSellSerializer(serializers.Serializer):
                 return order
         except:
             raise serializers.ValidationError('Order Could not be Placed')
+        
+# Cancel / Delete Particular Order
+class CancelOpenOrderSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+        coin = validated_data.get('coin')
+        orderid = validated_data.get('orderid')
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
+        
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        if not exist_api:
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
+        
+        if ('orderid' not in validated_data) or orderid == '':
+            raise serializers.ValidationError('orderid is required and cannot be blank')
+        
+        if ('coin' not in validated_data) or coin == '':
+            raise serializers.ValidationError('coin is required and cannot be blank')
+
+        order = col9.find_one({'OrderID': orderid, 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'_id': 0})
+        
+        if (not order) or (not coin):
+            raise serializers.ValidationError('Order not Found')        
+
+        if order['Coin'] != coin:
+            raise serializers.ValidationError('Given Coin does not match the Order Coin')
+
+        try:
+            c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
+            cancel_order = UMF_delete_order(c, x=coin, oid=order['OrderID'])
+            col9.update_one({'OrderID': orderid, 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'$set': {'Status': 'CANCELED'}})
+            return cancel_order
+        except:
+            raise serializers.ValidationError('Order Already Cancelled.')
