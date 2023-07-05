@@ -180,7 +180,21 @@ class MarketSellOrderView(views.APIView):
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: BinanceFuture Market Sell', err)
             return Response({'error': 'Error Occurred!'})
-        
+
+class ModifyOrderView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = ModifyOrderSerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': 'Order Modified Successfully.'}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Modify Order', err)
+            return Response({'error': 'Error Occurred!'})
+
 class CancelOpenOrderView(views.APIView):
     @method_decorator(csrf_exempt, name='dispatch')
     def post(self, request):
@@ -193,4 +207,18 @@ class CancelOpenOrderView(views.APIView):
             return Response({'error': ve.detail[0]})
         except Exception as err:
             tg.send(f'Error Occurred at \nAPI: BinanceFuture Cancel Order', err)
+            return Response({'error': 'Error Occurred!'})
+        
+class CancelAllOpenOrdersView(views.APIView):
+    @method_decorator(csrf_exempt, name='dispatch')
+    def post(self, request):
+        try:
+            serializer = CancelAllOpenOrderSerializer()
+            user = serializer.func(request.data)
+            if user:
+                return Response({'data': 'Orders Cancelled Successfully.'}, status=200)
+        except ValidationError as ve:
+            return Response({'error': ve.detail[0]})
+        except Exception as err:
+            tg.send(f'Error Occurred at \nAPI: BinanceFuture Cancel All Open Order', err)
             return Response({'error': 'Error Occurred!'})

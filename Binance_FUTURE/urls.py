@@ -14,5 +14,7 @@ urlpatterns = [
     path('limit_sell', LimitSellOrderView.as_view()),
     path('market_buy', MarketBuyOrderView.as_view()),
     path('market_sell', MarketSellOrderView.as_view()),
+    path('modify_order', ModifyOrderView.as_view()),
     path('cancel_order', CancelOpenOrderView.as_view()),
+    path('cancel_all_open', CancelAllOpenOrdersView.as_view()),
 ]

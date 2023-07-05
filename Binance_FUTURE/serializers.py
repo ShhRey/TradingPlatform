@@ -698,7 +698,91 @@ class PlaceMarketSellSerializer(serializers.Serializer):
                 return order
         except:
             raise serializers.ValidationError('Order Could not be Placed')
+
+# Modify Open Order
+class ModifyOrderSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+        orderid = validated_data.get('orderid')
+        coin = validated_data.get('coin')
+        price = validated_data.get('price')
+        quantity = validated_data.get('quantity')
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
         
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        if not exist_api:
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
+        
+        if ('coin' not in validated_data) or coin == '':
+            raise serializers.ValidationError('coin is required and cannot be blank')
+        
+        if ('price' not in validated_data) or price == '':
+            raise serializers.ValidationError('price is required and cannot be blank')
+        
+        if ('quantity' not in validated_data) or quantity == '':
+            raise serializers.ValidationError('quantity is required and cannot be blank')
+        
+        if ('orderid' not in validated_data) or orderid == '':
+            raise serializers.ValidationError('orderid is required and cannot be blank')
+        
+
+        exist_order = col9.find_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'_id': 0})
+        if not exist_order:
+            raise serializers.ValidationError('Order not Found')
+        if (float(exist_order['OrderPrice']) == float(price)) and (float(exist_order['OrderQty']) == float(quantity)):
+            raise serializers.ValidationError('Cannot modify order with same values')
+        try:
+            pre_values = check_futures_precision(coin=coin, price=price, quantity=quantity)
+            upd_price = float(pre_values[0])
+            upd_quantity = float(pre_values[1])
+            c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
+            if future_min_vol(coin=coin) <= (upd_price * upd_quantity):
+                mod_order = UMF_modify_order(c=c, oid=orderid, x=coin, s=exist_order['Side'], ot=exist_order['OrderType'], q=upd_quantity, pr=upd_price, ps=exist_order['PositionSide'])
+                col9.update_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'$set': {'Status': 'CANCELED'}})
+                col9.insert_one({
+                    'OrderID': str(mod_order[1]['orderId']), 
+                    'OrderTime': str(mod_order[1]['updateTime']), 
+                    'Coin': mod_order[1]['symbol'], 
+                    'OrderType': mod_order[1]['type'], 
+                    'Side': mod_order[1]['side'], 
+                    'PositionSide': mod_order[1]['positionSide'], 
+                    'OrderPrice': mod_order[1]['price'], 
+                    'OrderQty': mod_order[1]['origQty'], 
+                    'ExecQty': mod_order[1]['executedQty'], 
+                    'CummQuoteQty': mod_order[1]['cumQty'], 
+                    'Status': mod_order[1]['status'],
+                    'TimeInForce': mod_order[1]['timeInForce'],
+                    'UserID': user['UserID'],
+                    'ApiID': exist_api['ApiID'],
+                    'OrderedVia': "MANUAL",
+                })
+                return mod_order
+        except:
+            raise serializers.ValidationError('Order could not be Modified')
+
 # Cancel / Delete Particular Order
 class CancelOpenOrderSerializer(serializers.Serializer):
     def func(self, validated_data):
@@ -740,7 +824,7 @@ class CancelOpenOrderSerializer(serializers.Serializer):
         if ('coin' not in validated_data) or coin == '':
             raise serializers.ValidationError('coin is required and cannot be blank')
 
-        order = col9.find_one({'OrderID': orderid, 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'_id': 0})
+        order = col9.find_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'_id': 0})
         
         if (not order) or (not coin):
             raise serializers.ValidationError('Order not Found')        
@@ -751,7 +835,56 @@ class CancelOpenOrderSerializer(serializers.Serializer):
         try:
             c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
             cancel_order = UMF_delete_order(c, x=coin, oid=order['OrderID'])
-            col9.update_one({'OrderID': orderid, 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'$set': {'Status': 'CANCELED'}})
+            col9.update_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'$set': {'Status': 'CANCELED'}})
             return cancel_order
         except:
             raise serializers.ValidationError('Order Already Cancelled.')
+        
+# Cancel / Delete All Open Orders for a given Coin
+class CancelAllOpenOrderSerializer(serializers.Serializer):
+    def func(self, validated_data):
+        market = validated_data.get('market')
+        exchange = validated_data.get('exchange')
+        api_name = validated_data.get('api_name')
+        coin = validated_data.get('coin')
+
+        if "jwt" not in validated_data or validated_data.get("jwt") == '':
+            raise serializers.ValidationError('jwt is required and cannot be blank')
+        try:
+            jwt_data = validate_jwt(validated_data.get("jwt"))
+        except:
+            raise serializers.ValidationError("Invalid JWT token")
+        user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
+            
+        if ('market' not in validated_data) or (market == ''):
+            raise serializers.ValidationError('market is required and cannot be blank')
+        exist_market = col4.find_one({'Name': market}, {'_id': 0})
+        if not exist_market:
+            raise serializers.ValidationError('Invalid market provided')
+        
+        if ('exchange' not in validated_data) or (exchange == ''):
+            raise serializers.ValidationError('exchange is required and cannot be blank')
+        exist_exchange = col5.find_one({'Name': exchange}, {'_id': 0})
+        if not exist_exchange:
+            raise serializers.ValidationError('Invalid exchange provided')
+        
+        if ('api_name' not in validated_data) or (api_name == ''):
+            raise serializers.ValidationError('api_name is required and cannot be blank')
+        exist_api = col6.find_one({'Name': api_name, 'Exchange': exchange, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        if not exist_api:
+            raise serializers.ValidationError('Invalid api_name provided / API Inactive')
+
+        if ('coin' not in validated_data) or coin == '':
+            raise serializers.ValidationError('coin is required and cannot be blank')
+        
+        orders = list(col9.find({'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}))
+        if not orders:
+            raise serializers.ValidationError(f'No Open Orders Present for {coin}')
+        
+        try:
+            c = binanceFuturekey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
+            cancel_order = UMF_delete_all_orders(c, x=coin)
+            col9.update_many({'UserID': user['UserID'], 'ApiID': exist_api['ApiID'], 'Status': 'NEW', 'Coin': coin}, {'$set': {'Status': 'CANCELED'}})
+            return cancel_order
+        except:
+            raise serializers.ValidationError('Orders could not be Cancelled')
