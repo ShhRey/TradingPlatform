@@ -14,6 +14,7 @@ class RegisterUserSerializer(serializers.Serializer):
         email = validated_data.get('email')
         password = validated_data.get('password')
         confirm_password = validated_data.get('confirm_password')
+        userid = useridgen()
 
         if (('username' not in validated_data) or (username == '')):
             raise serializers.ValidationError('username is required and cannot be blank')
@@ -26,17 +27,31 @@ class RegisterUserSerializer(serializers.Serializer):
         if password != confirm_password:
             raise serializers.ValidationError('password and confirm_password did not match')
         
+        exchanges = list(col5.find({}, {'_id': 0, 'created_at': 0, 'created_by': 0}))
+        
         hash_pass = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
         dupl_user = col1.find_one({'$or': [{'UserName': username}, {'Email': email}]}, {'_id': 0})
         if not dupl_user:
             user = col1.insert_one({
-                'UserID': useridgen(),
+                'UserID': userid,
                 'UserName': username,
                 'Email': email,
                 'Password': hash_pass,
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             })
+            for exchange in exchanges:
+                col10.insert_one({
+                    'ApiID': itemidgen(), 
+                    'Name': exchange['Name']+'_PaperApi', 
+                    'Market': exchange['Market'],
+                    'Exchange': exchange['Name'],
+                    'Balance': {'USDT': '10000', 'BUSD': '10000', 'BTC': '5', 'ETH': '10', 'BNB': '100'}, 
+                    'Type': 'PAPER',
+                    'Status': 'ACTIVE',
+                    'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'created_by': {'UserID': userid, 'Name': username}
+                })
             tg.send(f'{username} Registered on TradeKeen using {email}')
             return user
         else:

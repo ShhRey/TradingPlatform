@@ -152,6 +152,8 @@ class AddExchangeSerializer(serializers.Serializer):
             raise serializers.ValidationError('type is required and cannot be blank')
         
         admin = col2.find_one({'AdminID': jwt_data['AdminID']}, {'_id': 0})
+        all_users = list(col1.find({}, {'_id': 0, 'created_at': 0}))
+
         dupl_exchange = col5.find_one({'Name': name}, {'_id': 0})
         if not dupl_exchange:
             exchange = col5.insert_one({
@@ -166,7 +168,20 @@ class AddExchangeSerializer(serializers.Serializer):
                     "AdminID": jwt_data['AdminID'],
                     "Name": admin['UserName']
                 }
-            })
+            })          
+            for user in all_users:
+                col10.insert_one({
+                    'ApiID': user['UserID'], 
+                    'Name': name+'_PaperApi', 
+                    'Market': market,
+                    'Exchange': name,
+                    'Balance': {'USDT': '10000', 'BUSD': '10000', 'BTC': '5', 'ETH': '10', 'BNB': '100'}, 
+                    'Type': 'PAPER',
+                    'Status': 'ACTIVE',
+                    'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    'created_by': {'UserID': user['UserID'], 'Name': user['UserName']}
+                })
+
             tg.send(f"{admin['UserName']} added New Exchange: {name} for {market}")
             call_command('startapp', name)
             return exchange
