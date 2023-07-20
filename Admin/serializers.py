@@ -28,7 +28,11 @@ class RegisterAdminSerializer(serializers.Serializer):
             raise serializers.ValidationError('password and confirm_password did not match')
         
         hash_pass = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
-        dupl_user = col2.find_one({'$or': [{'UserName': username}, {'Email': email}]}, {'_id': 0})
+        pipeline = [
+            {'$match': {'$or': [{'UserName': username}, {'Email': email}]}},
+            {'$project': {'_id': 0}}
+        ]
+        dupl_user = list(col2.aggregate(pipeline))
         if not dupl_user:
             user = col2.insert_one({
                 'AdminID': useridgen(),
@@ -54,10 +58,15 @@ class AdminLoginSerializer(serializers.Serializer):
         if (('password' not in validated_data) or (password == '')):
             raise serializers.ValidationError('password is required and cannot be blank')
         
-        hash_pass = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
-        user = col2.find_one({'Email': email, 'Password': hash_pass}, {'_id': 0})
-        if user:
-            jwt = generate_admin_token(adminid=user['AdminID'], email=user['Email'])
+        password = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
+        pipeline = [
+            {'$match': {'Email': email, 'Password': password}},
+            {'$project': {'_id': 0, 'AdminID': 1, 'Email': 1}}
+        ] 
+        user = col2.aggregate(pipeline)
+        user_data = next(user, None)
+        if user_data:
+            jwt = generate_admin_token(adminid=user_data['AdminID'], email=user_data['Email'])
             return jwt
         else:
             raise serializers.ValidationError('Invalid Credentials Entered')
@@ -72,7 +81,12 @@ class ViewProfileSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError("Invalid JWT token")
         
-        view_data = col2.find_one({'$or': [{'AdminID': jwt_data['AdminID']}, {'Email': jwt_data['Email']}]}, {'_id': 0, 'created_at': 0})
+        pipeline = [
+            {'$match': {'$or': [{'AdminID': jwt_data['AdminID']}, {'Email': jwt_data['Email']}]}},
+            {'$project': {'_id': 0, 'created_at': 0}}
+        ]
+        admin = col2.aggregate(pipeline)
+        view_data = next(admin, None)
         if view_data:
             return view_data
         else:
@@ -94,7 +108,11 @@ class AddMarketSerializer(serializers.Serializer):
             raise serializers.ValidationError('name is required and cannot be blank')
         
         admin = col2.find_one({'AdminID': jwt_data['AdminID']}, {'_id': 0})
-        dupl_market = col4.find_one({'Name': name}, {'_id': 0})
+        pipeline = [
+            {'$match': {'Name': name}},
+            {'$project': {'_id': 0}}
+        ]
+        dupl_market = list(col4.aggregate(pipeline))
         if not dupl_market and admin:
             market = col4.insert_one({
                 'MarketID': itemidgen(),
@@ -153,8 +171,11 @@ class AddExchangeSerializer(serializers.Serializer):
         
         admin = col2.find_one({'AdminID': jwt_data['AdminID']}, {'_id': 0})
         all_users = list(col1.find({}, {'_id': 0, 'created_at': 0}))
-
-        dupl_exchange = col5.find_one({'Name': name}, {'_id': 0})
+        pipeline = [
+            {'$match': {'Name': name}},
+            {'$project': {'_id': 0}}
+        ]
+        dupl_exchange = list(col5.aggregate(pipeline))
         if not dupl_exchange:
             exchange = col5.insert_one({
                 'ExchangeID': itemidgen(),
@@ -168,9 +189,8 @@ class AddExchangeSerializer(serializers.Serializer):
                     "AdminID": jwt_data['AdminID'],
                     "Name": admin['UserName']
                 }
-            })          
-            for user in all_users:
-                col10.insert_one({
+            })       
+            bulk_insertions = [{
                     'ApiID': user['UserID'], 
                     'Name': name+'_PaperApi', 
                     'Market': market,
@@ -180,7 +200,8 @@ class AddExchangeSerializer(serializers.Serializer):
                     'Status': 'ACTIVE',
                     'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                     'created_by': {'UserID': user['UserID'], 'Name': user['UserName']}
-                })
+                } for user in all_users]
+            col10.insert_many(bulk_insertions)
 
             tg.send(f"{admin['UserName']} added New Exchange: {name} for {market}")
             call_command('startapp', name)
@@ -241,7 +262,11 @@ class AddStrategySerializer(serializers.Serializer):
         parameters = insert_parameters
 
         admin = col2.find_one({'AdminID': jwt_data['AdminID']}, {'_id': 0})
-        dupl_strat = col7.find_one({'Name': name}, {'_id': 0})
+        pipeline = [
+            {'$match': {'Name': name}},
+            {'$project': {'_id': 0}}
+        ]
+        dupl_strat = col7.aggregate(pipeline)
         if not dupl_strat:
             strategy = col7.insert_one({
                 'StrategyID': itemidgen(),

@@ -35,7 +35,11 @@ class GetLiveApiBalSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         try:
             client = binanceSpotkey(key=exist_api['Fields']['API_KEY'], secret=exist_api['Fields']['SECRET_KEY'])
             api_bal = BS_API_Bal(c=client)
@@ -71,7 +75,11 @@ class GetDBApiBalSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID']}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         try:
             api_bal = exist_api['Balance']
             return api_bal
@@ -108,7 +116,11 @@ class ViewOpenOrderSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided')
         
@@ -156,7 +168,11 @@ class OrderHitorySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'created_by.UserID': jwt_data['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided')
         
@@ -205,7 +221,11 @@ class PlaceLimitBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -280,7 +300,11 @@ class PlaceLimitSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -355,7 +379,11 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -427,7 +455,11 @@ class PlaceMarketSellSerializer(serializers.Serializer):
         
         if ('api_name' not in validated_data) or (api_name == ''):
             raise serializers.ValidationError('api_name is required and cannot be blank')
-        exist_api = col6.find_one({'Name': api_name, 'Type':'LIVE', 'Status': 'ACTIVE', 'created_by.UserID': user['UserID']}, {'_id':0})
+        pipeline = [
+            {'$match': {'Name': api_name, 'created_by.UserID': jwt_data['UserID'], 'Type':'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_api = list(col6.aggregate(pipeline))
         if not exist_api:
             raise serializers.ValidationError('Invalid api_name provided / API Inactive')
         
@@ -517,7 +549,13 @@ class ModifyOrderSerializer(serializers.Serializer):
             raise serializers.ValidationError('orderid is required and cannot be blank')
         
 
-        exist_order = col8.find_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'_id': 0})
+        pipeline = [
+            {'$match': {'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}},
+            {'$addFields': {'Status': 'CANCELED'}},
+            {'$project': {'_id': 0}}
+        ]
+        exist_order = col8.aggregate(pipeline)
+        mod_order = None
         if not exist_order:
             raise serializers.ValidationError('Order not Found')
         if (float(exist_order['OrderPrice']) == float(price)) and (float(exist_order['OrderQty']) == float(quantity)):
@@ -530,7 +568,6 @@ class ModifyOrderSerializer(serializers.Serializer):
             if spot_min_vol(coin=coin) <= (upd_price * upd_quantity):
                 mod_order = BS_modify_order(c=c, oid=orderid, x=coin, s=exist_order['Side'], ot=exist_order['OrderType'], q=upd_quantity, pr=upd_price)
                 print(mod_order)
-                col8.update_one({'OrderID': orderid, 'Coin': coin, 'Status': 'NEW', 'UserID': user['UserID'], 'ApiID': exist_api['ApiID']}, {'$set': {'Status': 'CANCELED'}})
                 col8.insert_one({
                     'OrderID': str(mod_order['newOrderResponse']['orderId']), 
                     'OrderTime': str(mod_order['newOrderResponse']['transactTime']), 

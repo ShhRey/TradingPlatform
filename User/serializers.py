@@ -28,9 +28,14 @@ class RegisterUserSerializer(serializers.Serializer):
             raise serializers.ValidationError('password and confirm_password did not match')
         
         exchanges = list(col5.find({}, {'_id': 0, 'created_at': 0, 'created_by': 0}))
-        
         hash_pass = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
-        dupl_user = col1.find_one({'$or': [{'UserName': username}, {'Email': email}]}, {'_id': 0})
+
+        pipeline = [
+            {'$match': {'$or': [{'UserName': username}, {'Email': email}]}},
+            {'$project': {'_id': 0}}
+        ]
+        
+        dupl_user = list(col1.aggregate(pipeline))
         if not dupl_user:
             user = col1.insert_one({
                 'UserID': userid,
@@ -40,18 +45,19 @@ class RegisterUserSerializer(serializers.Serializer):
                 'Status': 'ACTIVE',
                 'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             })
-            for exchange in exchanges:
-                col10.insert_one({
-                    'ApiID': itemidgen(), 
-                    'Name': exchange['Name']+'_PaperApi', 
-                    'Market': exchange['Market'],
-                    'Exchange': exchange['Name'],
-                    'Balance': {'USDT': '10000', 'BUSD': '10000', 'BTC': '5', 'ETH': '10', 'BNB': '100'}, 
-                    'Type': 'PAPER',
-                    'Status': 'ACTIVE',
-                    'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-                    'created_by': {'UserID': userid, 'Name': username}
-                })
+
+            bulk_insertions = [{
+                'ApiID': itemidgen(), 
+                'Name': exchange['Name']+'_PaperApi', 
+                'Market': exchange['Market'],
+                'Exchange': exchange['Name'],
+                'Balance': {'USDT': '10000', 'BUSD': '10000', 'BTC': '5', 'ETH': '10', 'BNB': '100'}, 
+                'Type': 'PAPER',
+                'Status': 'ACTIVE',
+                'created_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                'created_by': {'UserID': userid, 'Name': username}
+            } for exchange in exchanges]
+            col10.insert_many(bulk_insertions)
             tg.send(f'{username} Registered on TradeKeen using {email}')
             return user
         else:
@@ -67,11 +73,16 @@ class LoginUserSerializer(serializers.Serializer):
             raise serializers.ValidationError('email is required and cannot be blank')
         if (('password' not in validated_data) or (password == '')):
             raise serializers.ValidationError('password is required and cannot be blank')
-        
-        hash_pass = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
-        user = col1.find_one({'Email': email, 'Password': hash_pass}, {'_id': 0})
-        if user:
-            jwt = generate_user_token(userid=user['UserID'], email=user['Email'])
+
+        password = hashlib.sha256(bytes(password, 'utf-8')).hexdigest()
+        pipeline = [
+            {'$match': {'Email': email, 'Password': password}},
+            {'$project': {'_id': 0, 'UserID': 1, 'Email': 1}}
+        ]
+        user = col1.aggregate(pipeline)
+        user_data = next(user, None)
+        if user_data:
+            jwt = generate_user_token(userid=user_data['UserID'], email=user_data['Email'])
             return jwt
         else:
             raise serializers.ValidationError('Invalid Credentials Entered')
@@ -86,7 +97,12 @@ class ViewProfileSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError("Invalid JWT token")
         
-        view_data = col1.find_one({'$or': [{'UserID': jwt_data['UserID']}, {'Email': jwt_data['Email']}]}, {'_id': 0, 'created_at': 0})
+        pipeline = [
+            {'$match': {'$or': [{'UserID': jwt_data['UserID']}, {'Email': jwt_data['Email']}]}},
+            {'$project': {'_id': 0, 'created_at': 0}}
+        ]
+        user = col1.aggregate(pipeline)
+        view_data = next(user, None)
         if view_data:
             return view_data
         else:
@@ -108,17 +124,26 @@ class UpdateProfileSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError("Invalid JWT token")
         
-        user = col1.find_one({'UserID': jwt_data['UserID'], 'Email': jwt_data['Email']}, {'_id': 0})
-        if user:
-            if (username == user['UserName']):
-                return 1
-            else:
-                col1.update_one({'UserID': jwt_data['UserID']}, {'$set': {
-                    'UserName': username if username else user['UserName'],
+        pipeline = [
+            {'$match': {'UserID': jwt_data['UserID'], 'Email': jwt_data['Email']}},
+            {'$project': {'_id': 0, 'UserName': 1}}
+        ]
+        
+        user = col1.aggregate(pipeline)
+        user_data = next(user, None)
+        if user_data:
+            update_pipeline =[
+                {'$match': {'UserID': jwt_data['UserID']}},
+                {'$addFields': {
+                    'UserName': {'$cond': [{'$eq': [username, None]}, '$UserName', username]},
                     'updated_at': dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-                }})
+                }}
+            ]
+            col1.update_one({'UserID': jwt_data['UserID']}, update_pipeline[1]['$addFields'])
+            if username and username != user_data['UserName']:
                 tg.send(f"{user['UserName']} Updated username to {username}")
-                return 2
+            
+            return 1 if username == user_data['UserName'] else 2
         else:
             raise serializers.ValidationError('User does not Exist')
         
@@ -179,9 +204,16 @@ class AddApiSerializer(serializers.Serializer):
                 asset_bal = UMF_API_Bal(c=user_client)
         except:
             raise serializers.ValidationError("Invalid API or SECRET KEY provided")
- 
+
         user = col1.find_one({'UserID': jwt_data['UserID']}, {'_id': 0})
-        dupl_api = col6.find_one({'$or': [{'Name': name, 'created_by.Name': user['UserName']}, {"Exchange": exchange, 'created_by.Name': user['UserName']}, {'fields.API_KEY': validated_data['fields']['API_KEY'], 'fields.SECRET_KEY': validated_data['fields']['SECRET_KEY']}]}, {'_id': 0})
+        pipeline = [
+            {'$match': {'$or': [{'Name': name, 'created_by.Name': user['UserName']}, 
+                {'Exchange': exchange, 'created_by.Name': jwt_data['UserName']},
+                {'fields.API_KEY': fields.get('API_KEY', ''), 'fields.SECRET_KEY': fields.get('SECRET_KEY', '')}]
+            }},
+            {'$project': {'_id': 0}}
+        ]
+        dupl_api = list(col6.aggregate(pipeline))
         if not dupl_api:
             api = col6.insert_one({
                 'ApiID': itemidgen(),
@@ -216,7 +248,12 @@ class ActiveApiSerializer(serializers.Serializer):
             jwt_data = validate_jwt(validated_data.get("jwt"))
         except:
             raise serializers.ValidationError("Invalid JWT token")
-        user_apis = list(col6.find({'created_by.UserID': jwt_data['UserID'], 'Type': 'LIVE', 'Status': 'ACTIVE'}, {'_id': 0}))
+        
+        pipeline = [
+            {'$match': {'created_by.UserID': jwt_data['UserID'], 'Type': 'LIVE', 'Status': 'ACTIVE'}},
+            {'$project': {'_id': 0}}
+        ]
+        user_apis = list(col6.aggregate(pipeline))
         if user_apis:
             return user_apis
         else: 
