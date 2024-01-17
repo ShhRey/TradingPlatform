@@ -36,8 +36,8 @@ def update_ListenKey(key, secret, exchange, listen_key):
     
 
 # Integrating Functionality for Websocket to Check / Update ListenKey for Particular User
-# my_api_key = 'pyIOrHM8vHdEaZEM1wSRnydPFQA87rvz2XpuPQaOVZDPO3y67e0J2p1ZejI8kdx3'
-# my_secret_key = 'eOyFGHrRFnaM0R7ogMlV49BxX3KBqA9bbjQl0vTMRqNGfnodFxhvheVmadWMD6eA'
+# my_api_key = ''
+# my_secret_key = ''
 # listen_key = None
 # exchange = str(input('Enter Exchange: '))
 
