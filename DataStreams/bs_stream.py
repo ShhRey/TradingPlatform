@@ -1,8 +1,8 @@
 from binance.spot import Spot
 import websocket, json
 
-my_api_key = 'pyIOrHM8vHdEaZEM1wSRnydPFQA87rvz2XpuPQaOVZDPO3y67e0J2p1ZejI8kdx3'
-my_secret_key = 'eOyFGHrRFnaM0R7ogMlV49BxX3KBqA9bbjQl0vTMRqNGfnodFxhvheVmadWMD6eA'
+my_api_key = ''
+my_secret_key = ''
 
 def generate_BS_ListenKey(key, secret):
     fc = Spot(api_key=key, api_secret=secret)
